@@ -1,23 +1,18 @@
-DEFINES=-DDEBUG_ENABLE=1
+CFLAGS:=-std=c99 -MMD -pedantic -Wall -Wextra -O3 -DDEBUG_ENABLE=0
+SRCS:=aes.c enc.c log.c test.c
+OBJS:=$(SRCS:%.c=%.o)
 
-all: aes.o
+all: test
 
-aes.o: aes.c aes.h Makefile common.h
-	${CC} -std=c99 ${DEFINES} -pedantic -Wall -Wextra -O3 -c aes.c -o aes.o
-
-log.o: log.c log.h Makefile common.h
-	${CC} -std=c99 ${DEFINES} -pedantic -Wall -Wextra -O3 -c log.c -o log.o
-
-test.o: test.c Makefile common.h
-	${CC} -std=c99 ${DEFINES} -pedantic -Wall -Wextra -O3 -c test.c -o test.o
-
-test: aes.o test.o Makefile log.o
-	${CC} -std=c99 ${DEFINES} -pedantic -Wall -Wextra -O3 aes.o test.o log.o -o test
+test: ${OBJS}
+	${CC} ${DEFINES} $^ -o $@
 
 check: test Makefile
 	./test
 
 clean:
-	rm -f *.o test
+	rm -f *.o *.d test
 
 .PHONY: all check clean
+
+-include *.d

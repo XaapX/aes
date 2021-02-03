@@ -38,15 +38,38 @@ void debug_print_state(const uint8_t *state)
 //Print a block or any 16-byte array in 1D form, following memory order
 void debug_print_block(const uint8_t *block)
 {
-    for (int i = 0; i < AES_BLOCK_LEN_BYTES; ++i)
-    {
-        db_printf("%02x", block[i]);
-    }
-    db_printf("\n");
+#if DEBUG_ENABLE==1
+    print_block(block, 0);
+#endif
 }
 
 void debug_trace_cipher_states(int round, const char *label, const uint8_t *block)
 {
     db_printf("round[%2d].%s=", round, label);
     debug_print_block(block);
+}
+
+
+void print_block(const uint8_t *block, int blockdisp)
+{
+    if (blockdisp)
+    {
+        // Block mode TODO
+    }
+    else
+    {
+        for (int i = 0; i < AES_BLOCK_LEN_BYTES; ++i)
+        {
+            printf("%02x", block[i]);
+        }
+        printf("\n");
+    }
+}
+
+void print_blocks(const uint8_t *block, int blocks, int blockdisp)
+{
+    for (int i = 0; i < blocks; ++i)
+    {
+        print_block(&block[i * 16], blockdisp);
+    }
 }
