@@ -4,6 +4,7 @@
 
 typedef enum
 {
+    AES_MODE_UNKNOWN,
     AES_MODE_ECB,
     AES_MODE_CBC
 } aes_mode_t;

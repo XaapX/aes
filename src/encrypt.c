@@ -4,11 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #include "encrypt.h"
 #include "cipher.h"
 #include "common.h"
-
 
 static int aes_encrypt_one_block(const aes_params_t *aes_params,
                                  const uint8_t *restrict blockin, uint8_t *restrict blockout);
@@ -16,15 +14,16 @@ static int aes_encrypt_init(const aes_params_t *aes_params);
 static int aes_encrypt_close();
 
 static uint8_t iv[AES_BLOCK_LEN_BYTES];
-// static long itr;
 
 static int aes_encrypt_init(const aes_params_t *aes_params)
 {
     if (aes_init() != 0)
         return -1;
 
-    // itr = 0;
-    memcpy(iv, aes_params->iv, AES_BLOCK_LEN_BYTES);
+    if (aes_params->mode == AES_MODE_CBC)
+    {
+        memcpy(iv, aes_params->iv, AES_BLOCK_LEN_BYTES);
+    }
 
     aes_expand_key(aes_params->key, 16);
 
@@ -126,6 +125,10 @@ static int aes_encrypt_one_block(const aes_params_t *aes_params,
 
         // Prepare iv for next round
         memcpy(iv, blockout, 16);
+    }
+    else if (aes_params->mode == AES_MODE_ECB)
+    {
+        aes_cipher_block(blockin, blockout);
     }
     else
     {

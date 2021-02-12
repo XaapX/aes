@@ -30,7 +30,7 @@ ${TEST_BIN}: ${LIB_OBJS} ${TEST_OBJS}
 ${APP_BIN}: ${LIB_OBJS} ${APP_OBJS}
 	${CC} ${CFLAGS} ${DEFINES} $^ -o $@
 
-check: ${TEST_BIN} Makefile
+check: ${TEST_BIN}
 	./${TEST_BIN}
 
 clean:
