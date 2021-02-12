@@ -1,7 +1,8 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "aes.h"
+#include "cipher.h"
 #include "log.h"
 #include "common.h"
 
@@ -10,7 +11,7 @@ static void MixColumns(uint8_t *state);
 static void RotWord(const uint8_t * restrict in, uint8_t * restrict out);
 static void ShiftRows(uint8_t *state);
 static void SubBytes(uint8_t *state);
-static void SubWord(const uint8_t * restrict in, uint8_t * restrict out);
+static void SubWord(const uint8_t * in, uint8_t * out);
 
 // convert state coordinates to linear array byte index
 inline static int ST_IDX(int row, int col)
@@ -78,36 +79,20 @@ static uint8_t xtime(uint8_t x)
 
 static void MixColumns(uint8_t *state)
 {
-    uint8_t oldstate[16];
-    memcpy(oldstate, state, 16);
-    memset(state, 0 , 16);
+    uint8_t oldstate[AES_BLOCK_LEN_BYTES];
+    memcpy(oldstate, state, AES_BLOCK_LEN_BYTES);
+    memset(state, 0 , AES_BLOCK_LEN_BYTES);
 
     // Very naive approach... Can be optimized
     for (int col = 0; col < 4; col++)
     {
-        int row = 0;
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(0, col)]); // *2
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(1, col)]) ^ oldstate[ST_IDX(1, col)]; // *3
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(2, col)]; // * 1
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(3, col)];
-
-        row = 1;
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(0, col)];
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(1, col)]);
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(2, col)]) ^ oldstate[ST_IDX(2, col)];
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(3, col)];
-
-        row = 2;
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(0, col)];
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(1, col)];
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(2, col)]);
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(3, col)]) ^ oldstate[ST_IDX(3, col)];
-
-        row = 3;
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(0, col)]) ^ oldstate[ST_IDX(0, col)];
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(1, col)];
-        state[ST_IDX(row, col)] ^= oldstate[ST_IDX(2, col)];
-        state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(3, col)]);
+        for (int row = 0; row < 4; row++)
+        {
+            state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX(row, col)]);
+            state[ST_IDX(row, col)] ^= xtime(oldstate[ST_IDX((row + 1) % 4, col)]) ^ oldstate[ST_IDX((row + 1) % 4, col)];
+            state[ST_IDX(row, col)] ^= oldstate[ST_IDX((row + 2) % 4, col)];
+            state[ST_IDX(row, col)] ^= oldstate[ST_IDX((row + 3) % 4, col)];
+        }
     }
 }
 
@@ -125,9 +110,8 @@ static void RotWord(const uint8_t * restrict in, uint8_t * restrict out)
 // shifting the last three rows of the State by different offsets.
 static void ShiftRows(uint8_t *state)
 {
-    //XXX can be optimized by not copying first row
-    uint8_t oldstate[16];
-    memcpy(oldstate, state, 16);
+    uint8_t oldstate[AES_BLOCK_LEN_BYTES];
+    memcpy(oldstate, state, AES_BLOCK_LEN_BYTES);
 
     for (int row = 1; row < 4; ++row)
     {
@@ -138,25 +122,21 @@ static void ShiftRows(uint8_t *state)
     }
 }
 
-
 // Transformation in the Cipher that processes the State using a non­
 // linear byte substitution table (S-box) that operates on each of the
 // State bytes independently.
 static void SubBytes(uint8_t *state)
 {
-    uint8_t oldstate[16];
-    memcpy(oldstate, state, 16);
-
     for (int i = 0; i < 4; ++i)
     {
-        SubWord(oldstate + i * 4, state + i * 4);
+        SubWord(state + i * 4, state + i * 4);
     }
 }
 
 // Function used in the Key Expansion routine that takes a four-byte
 // input word and applies an S-box to each of the four bytes to
 // produce an output word.
-static void SubWord(const uint8_t * restrict in, uint8_t * restrict out)
+static void SubWord(const uint8_t * in, uint8_t * out)
 {
     for (int i = 0; i < 4; ++i)
     {
@@ -219,31 +199,21 @@ static void Cipher(const uint8_t* restrict in, uint8_t* restrict out, const uint
     uint8_t state[AES_BLOCK_LEN_BYTES];
     int round = 0;
 
-    memcpy(state, in, 16);
-    // state_from_block(state, in);
+    memcpy(state, in, AES_BLOCK_LEN_BYTES);
 
     AddRoundKey(state, &w[round]);
-    debug_trace_cipher_states(0, "input", in);
-    debug_trace_cipher_states(0, "k_sch", w);
 
     for (round = 1; round <= Nr; ++round)
     {
 
-        debug_trace_cipher_states(round, "start", state);
         SubBytes(state);
-        debug_trace_cipher_states(round, "s_box", state);
         ShiftRows(state);
-        debug_trace_cipher_states(round, "s_row", state);
         if (round < Nr)
         {
             MixColumns(state);
-            debug_trace_cipher_states(round, "m_col", state);
         }
         AddRoundKey(state, &w[round * 16]);
-        debug_trace_cipher_states(round, "k_sch", &w[round * 16]);
     }
-
-    debug_trace_cipher_states(round - 1, "outpt", state);
 
     memcpy(out, state, 16);
 }
@@ -264,13 +234,6 @@ int aes_init(void)
         //All the rest is already initialized to 0...
     }
 
-    db_printf("RCON=");
-    for (int i = 0; i < 11; ++i)
-    {
-        db_printf("%02X%02X%02X%02X ", rcon[i * 4], rcon[i * 4 + 1], rcon[i * 4 + 2], rcon[i * 4 + 3]);
-    }
-    db_printf("\n");;
-
     return 0;
 }
 
@@ -279,20 +242,26 @@ int aes_free(void)
     return 0;
 }
 
-void aes_encrypt_block(const uint8_t * restrict K, const uint8_t * restrict input, uint8_t * restrict output)
+// XXX Global shared state...
+static uint8_t w[4 * 4 * 11];
+
+void aes_expand_key(const uint8_t * restrict K, int size)
 {
-    uint8_t w[4 * 4 * 11];
+    if (size != 16)
+        exit(1);
 
     // Expand the key K to a key schedule array w
     KeyExpansion(K, w, Nk);
+}
 
+void aes_cipher_block(const uint8_t * restrict input, uint8_t * restrict output)
+{
     // Call cipher with generated key schedule
     Cipher(input, output, w);
 }
 
-void aes_decrypt_block(const uint8_t * restrict K, const uint8_t * restrict input, uint8_t * restrict output)
+void aes_decipher_block(const uint8_t * restrict input, uint8_t * restrict output)
 {
-    (void)K;
     (void)input;
     (void)output;
 }

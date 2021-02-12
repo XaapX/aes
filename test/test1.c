@@ -2,8 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "aes.h"
-#include "enc.h"
+#include "cipher.h"
+#include "encrypt.h"
 #include "log.h"
 
 int main()
@@ -34,7 +34,8 @@ int main()
 
     for (int i = 0; i < KEY_COUNT; ++i)
     {
-        aes_encrypt_block(key[i], data[i], out);
+        aes_expand_key(key[i], 16);
+        aes_cipher_block(data[i], out);
         failure = memcmp(expected[i], out, 16);
         printf("TEST %d:", i);
         if (failure != 0)
@@ -72,7 +73,6 @@ int main()
                                  0x9d, 0xfd, 0xe2, 0xc8, 0x88, 0x9e, 0xdf, 0x0d, 0x1a, 0xa7, 0xc2, 0xa6, 0x53, 0xf0, 0xfd, 0xb5
                                 };
     uint8_t cbc_key[16]       = {0xad, 0x5f, 0x51, 0xd7, 0x8f, 0xf7, 0x0a, 0x45, 0x24, 0xf1, 0xba, 0x57, 0x9e, 0xd9, 0xf7, 0x54};
-
     const
     uint8_t  cbc_exp[12 * 16] = {0x3f, 0x7a, 0x41, 0x17, 0x29, 0xfc, 0x13, 0xda, 0xd4, 0xb7, 0xd9, 0x88, 0x6c, 0xd5, 0xc0, 0xfd,
                                  0x13, 0xd8, 0x7d, 0xd8, 0x5b, 0x88, 0x72, 0x1b, 0xa0, 0x34, 0x18, 0x88, 0x70, 0x7f, 0xbb, 0x28,
@@ -89,8 +89,13 @@ int main()
                                 };
 
     uint8_t * out_big = malloc(1024);
-    ret = aes_encrypt(AES_MODE_CBC, cbc_data, out_big, 1024, cbc_key, cbc_iv);
-    // print_blocks(out_big, 12, 0);
+
+    aes_params_t aes_params;
+    aes_params.mode = AES_MODE_CBC;
+    aes_params.key = cbc_key;
+    aes_params.iv = cbc_iv;
+
+    ret = aes_encrypt_arrays(&aes_params, cbc_data, sizeof(cbc_data), out_big, 1024);
 
     printf("CBC CHECK: ");
     if (ret == 0)
@@ -106,7 +111,7 @@ int main()
     }
     else
     {
-        puts("FAILURE");
+        puts("ERROR");
     }
     free (out_big);
 

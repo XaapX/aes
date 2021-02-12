@@ -1,0 +1,5 @@
+AES-CBC implementation
+
+Currently limited to only encrypt, with CBC or cipher blocks
+No decryption
+Limited to AES128

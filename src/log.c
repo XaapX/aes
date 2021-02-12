@@ -40,6 +40,8 @@ void debug_print_block(const uint8_t *block)
 {
 #if DEBUG_ENABLE==1
     print_block(block, 0);
+#else
+    (void)block;
 #endif
 }
 
